@@ -1,0 +1,182 @@
+﻿@page "/customcontrols"
+
+
+@using BlazorLeaflet.Models
+@using BlazorLeaflet.Models.Events
+@inject IJSRuntime jsRuntime
+@inject AirportServices service
+
+
+<h1>Location Search</h1>
+
+<div class="form-inline m-2">
+    <div class="form-group mb-2">
+        <label style="color:white;">Lat </label>
+        <input class="form-control ml-2 mr-2" placeholder="city name" @bind="_markerLatLng.Lat" disabled />
+    </div>
+
+    <div class="form-group mb-2">
+        <label style="color:white;">Lng </label>
+        <input class="form-control ml-2 mr-2" placeholder="city name" @bind="_markerLatLng.Lng" disabled />
+    </div>
+</div>
+
+<div class="form-inline m-2">
+    <div class="form-group mb-2">
+        <label style="color:white;">Distance </label>
+        <input class="form-control ml-2 mr-2" placeholder="0" @bind="threshold" />
+    </div>
+    <button class="btn btn-primary mb-2" @onclick="distanceAirport">Search</button>
+</div>
+
+<div style="height: 500px; width: 500px;">
+    <LeafletMap Map="_map" />
+</div>
+
+
+
+
+@code
+{ 
+    List<Airport> Airports = new List<Airport>();
+    private double threshold;
+    private double distance;
+    private Map _map;
+    private DrawHandler _drawHandler;
+    private LatLng _markerLatLng = new LatLng { Lat = 47.5574007f, Lng = 16.3918687f };
+
+    protected override void OnInitialized()
+    {
+        var marker = new Marker(_markerLatLng)
+        {
+            Draggable = true,
+            Title = "Marker 1",
+            Popup = new Popup { Content = string.Format("I am at {0:0.00}° lat, {1:0.00}° lng", _markerLatLng.Lat, _markerLatLng.Lng) },
+            Tooltip = new Tooltip { Content = "Click and drag to move me" }
+        };
+        _map = new Map(jsRuntime)
+        {
+            Center = _markerLatLng,
+            Zoom = 4.8f
+        };
+        _map.OnInitialized += () =>
+        {
+            _map.AddLayer(new TileLayer
+            {
+                UrlTemplate = "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                Attribution = "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors",
+            });
+            _map.AddLayer(marker);
+        };
+        _drawHandler = new DrawHandler(_map, jsRuntime);
+        marker.OnMove += OnDrag;
+        marker.OnMoveEnd += OnDragEnd;
+    }
+
+    private void OnDrag(Marker marker, DragEvent evt)
+    {
+        _markerLatLng = evt.LatLng;
+        StateHasChanged();
+    }
+
+    private async void OnDragEnd(Marker marker, Event e)
+    {
+        marker.Position = _markerLatLng;
+        marker.Popup.Content = string.Format("I am now at {0:0.00}° lat, {1:0.00}° lng", _markerLatLng.Lat, _markerLatLng.Lng);
+        await LeafletInterops.UpdatePopupContent(jsRuntime, _map.Id, marker);
+    }
+
+    private void ClearMap()
+    {
+        int count = 0;
+        foreach (var layer in _map.GetLayers())
+        {
+            if (count < 2)
+            {
+                count ++;
+                continue;
+            }
+            _map.RemoveLayer(layer);
+        }
+    }
+
+    static double toRadians(double angleIn10thofaDegree)
+    {
+        // Angle in 10th
+        // of a degree
+        return (angleIn10thofaDegree *
+                       Math.PI) / 180;
+    }
+
+    static double Getdistance(double lat1,
+                           double lat2,
+                           double lon1,
+                           double lon2)
+    {
+
+        // The math module contains
+        // a function named toRadians
+        // which converts from degrees
+        // to radians.
+        lon1 = toRadians(lon1);
+        lon2 = toRadians(lon2);
+        lat1 = toRadians(lat1);
+        lat2 = toRadians(lat2);
+
+        // Haversine formula
+        double dlon = lon2 - lon1;
+        double dlat = lat2 - lat1;
+        double a = Math.Pow(Math.Sin(dlat / 2), 2) +
+                   Math.Cos(lat1) * Math.Cos(lat2) *
+                   Math.Pow(Math.Sin(dlon / 2), 2);
+
+        double c = 2 * Math.Asin(Math.Sqrt(a));
+        // Radius of earth in
+        // kilometers. Use 3956
+        // for miles
+        double r = 6371;
+
+        // calculate the result
+        return (c * r);
+    }
+
+
+
+    private async Task distanceAirport()
+    {
+        Airports = await service.GetAirportAsync();
+
+        ClearMap();
+
+        if (Airports.Any())
+        {
+            foreach (var Airport in Airports)
+            {
+                distance = Getdistance(Airport.Latitude,(double)_markerLatLng.Lat,Airport.Longitude,(double)_markerLatLng.Lng);
+
+                if(distance < threshold)
+                {
+                    var LatLng = new LatLng((float)Airport.Latitude, (float)Airport.Longitude);
+                    var marker = new Marker(LatLng)
+                    {
+                        Icon = new Icon
+                        {
+                            Url = "https://cdn4.iconfinder.com/data/icons/ionicons/512/icon-plane-512.png",
+                            ClassName = "map-icon"
+                        },
+
+
+                        Draggable = false,
+                        Title = Airport.Name,
+                        Popup = new Popup { Content = string.Format("I am at {0:0.00}° lat, {1:0.00}° lng", LatLng.Lat, LatLng.Lng) }
+
+                    };
+
+                    _map.AddLayer(marker);
+                }
+            }
+        }
+
+    }
+
+}

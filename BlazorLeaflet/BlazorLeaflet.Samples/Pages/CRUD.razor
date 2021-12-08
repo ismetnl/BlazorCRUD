@@ -1,0 +1,193 @@
+﻿@page "/CRUD"
+
+@inject AirportServices service
+
+
+<div class="container">
+    <div class="row bg-light">
+        <table class="table table-bordered">
+            <thead class="thead-dark">
+                <tr>
+                    <th>Airport Id</th>
+                    <th>Name</th>
+                    <th>City</th>
+                    <th>District</th>
+                    <th>Latitude</th>
+                    <th>Longitude</th>
+                    <th>Delete Product</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Airports.Any())
+                {
+                    @foreach (var Airport in Airports)
+                    {
+                        <tr @onclick="(() => SetAirportForUpdate(Airport))">
+                            <td>@Airport.Id</td>
+                            <td>@Airport.Name</td>
+                            <td>@Airport.City</td>
+                            <td>@Airport.District</td>
+                            <td>@Airport.Latitude</td>
+                            <td>@Airport.Longitude</td>
+                            <td><button class="btn btn-danger" @onclick="(() => DeleteAirport(Airport))">Delete</button></td>
+                        </tr>} }
+                 else
+                 {<tr><td colspan="6"><strong>No Airports available</strong></td></tr>}
+            </tbody>
+        </table>
+    </div>
+
+    <div>
+        <button class="btn btn-secondary" @onclick="@(e => NavigateTo("prev"))">Prev</button>
+        @for (int i = 0; i < TotalPage; i++)
+        {
+            var pageNumber = i;
+            <button class="btn @(CurrentPage == pageNumber? "btn-dark":"btn-info")" @onclick="@(e => UpdateList(pageNumber))">@(i+1)</button>
+        }
+        <button class="btn btn-secondary" @onclick="@(e => NavigateTo("next"))">Next</button>
+    </div>
+
+
+
+    <div class="row m-5">
+        <div class="col-5 bg-light m-2 justify-content-start">
+            <div class="p-3 mb-3 bg-primary text-white text-center">Add New Airport</div>
+            <EditForm Model="@NewAirport">
+                <div class="form-group">
+                    <label for="name">Airport Name</label>
+                    <input type="text" id="name" class="form-control" @bind-value="@NewAirport.Name" />
+                </div>
+                <div class="form-group">
+                    <label for="City">City</label>
+                    <input type="text" id="City" class="form-control" @bind="@NewAirport.City" />
+                </div>
+                <div class="form-group">
+                    <label for="District">District</label>
+                    <input type="text" id="District" class="form-control" @bind="@NewAirport.District" />
+                </div>
+                <div class="form-group">
+                    <label for="Latitude">Latitude</label>
+                    <input type="text" id="Latitude" class="form-control" @bind="@NewAirport.Latitude" />
+                </div>
+                <div class="form-group">
+                    <label for="Longitude">Longitude</label>
+                    <input type="text" id="Longitude" class="form-control" @bind="@NewAirport.Longitude" />
+                </div>
+                <div class="text-center p-3 mb-3">
+                    <button class="btn btn-info" @onclick="AddNewAirport"> Add Airport</button>
+                </div>
+            </EditForm>
+        </div>
+        <div class="col-5 bg-light m-2 justify-content-end">
+            <div class="p-3 mb-1 bg-primary text-white text-center">Update Airport</div>
+            <EditForm Model="@UpdateAirport">
+                <div class="form-group">
+                    <label for="name">Airport Name</label>
+                    <input type="text" id="name" class="form-control" @bind-value="@UpdateAirport.Name" />
+                </div>
+                <div class="form-group">
+                    <label for="City">City</label>
+                    <input type="text" id="City" class="form-control" @bind="@UpdateAirport.City" />
+                </div>
+                <div class="form-group">
+                    <label for="District">District</label>
+                    <input type="text" id="District" class="form-control" @bind="@UpdateAirport.District" />
+                </div>
+                <div class="form-group">
+                    <label for="Latitude">Latitude</label>
+                    <input type="text" id="Latitude" class="form-control" @bind="@UpdateAirport.Latitude" />
+                </div>
+                <div class="form-group">
+                    <label for="Longitude">Longitude</label>
+                    <input type="text" id="Longitude" class="form-control" @bind="@UpdateAirport.Longitude" />
+                </div>
+                <div class="text-center p-3 mb-3">
+                    <button class="btn btn-info" @onclick="UpdateAirportData"> Update Airport</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+@code {
+    List<Airport> Airports = new List<Airport>();
+    List<Airport> AirportList = new List<Airport>();
+    public int PageSize { get; set; }
+    public int TotalPage { get; set; }
+    public int CurrentPage { get; set; }
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshAirports();
+    }
+
+
+
+    private async Task RefreshAirports()
+    {
+        PageSize = 5;
+
+        AirportList = await service.GetAirportAsync();
+
+        Airports = AirportList.Take(PageSize).ToList();
+
+        TotalPage = (int)Math.Ceiling(AirportList.Count() / (decimal)PageSize);
+
+    }
+
+    private void UpdateList(int pageNumber)
+    {
+        CurrentPage = pageNumber;
+        Airports = AirportList.Skip(pageNumber * PageSize).Take(PageSize).ToList();
+    }
+
+
+    private void NavigateTo(string direction)
+    {
+        if (direction == "prev" && CurrentPage != 0)
+        {
+            CurrentPage -= 1;
+        }
+        if (direction == "next" && CurrentPage != TotalPage - 1)
+        {
+            CurrentPage += 1;
+        }
+
+        UpdateList(CurrentPage);
+    }
+
+
+
+
+    public Airport NewAirport { get; set; } = new Airport();
+    private async Task AddNewAirport()
+    {
+        await service.AddAirportAsync(NewAirport);
+        NewAirport = new Airport();
+        await RefreshAirports();
+    }
+
+
+
+    Airport UpdateAirport = new Airport();
+    private void SetAirportForUpdate(Airport Airport)
+    {
+        UpdateAirport = Airport;
+    }
+
+
+
+    private async Task UpdateAirportData()
+    {
+        await service.UpdateAirportAsync(UpdateAirport);
+        await RefreshAirports();
+    }
+
+
+    private async Task DeleteAirport(Airport Airport)
+    {
+        await service.DeleteAirportAsync(Airport);
+        await RefreshAirports();
+    }
+}
